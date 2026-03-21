@@ -1,101 +1,167 @@
 "use client";
 
-import Navbar from "@/components/Navbar";
-import Link from "next/link";
+import React, {
+  forwardRef,
+  useMemo,
+  useRef,
+  useEffect,
+} from "react";
 import { motion } from "framer-motion";
-import { useState, useRef } from "react";
-import VariableProximity from "@/components/VariableProximity";
 
-export default function TestPage() {
-  const containerRef = useRef<HTMLDivElement | null>(null); // ✅ FIXED
+/* ✅ FIXED TYPE HERE */
+type Props = {
+  label: string;
+  fromFontVariationSettings: string;
+  toFontVariationSettings: string;
+  containerRef: React.RefObject<HTMLElement | null>;
+  radius?: number;
+  className?: string;
+  style?: React.CSSProperties;
+};
 
-  const games = [
+function useAnimationFrame(callback: () => void) {
+  useEffect(() => {
+    let frameId: number;
+
+    const loop = () => {
+      callback();
+      frameId = requestAnimationFrame(loop);
+    };
+
+    frameId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(frameId);
+  }, [callback]);
+}
+
+function useMousePositionRef(
+  containerRef: React.RefObject<HTMLElement | null>
+) {
+  const positionRef = useRef({ x: 0, y: 0 });
+
+  useEffect(() => {
+    const updatePosition = (x: number, y: number) => {
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        positionRef.current = {
+          x: x - rect.left,
+          y: y - rect.top,
+        };
+      }
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      updatePosition(e.clientX, e.clientY);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    return () => window.removeEventListener("mousemove", handleMouseMove);
+  }, [containerRef]);
+
+  return positionRef;
+}
+
+const VariableProximity = forwardRef<HTMLSpanElement, Props>(
+  (
     {
-      id: 1,
-      name: "KeyPop",
-      image:
-        "https://img.sanishtech.com/u/1eaed2054c125682af4d4d79086ec4d2.png",
-      path: "",
+      label,
+      fromFontVariationSettings,
+      toFontVariationSettings,
+      containerRef,
+      radius = 120,
+      className = "",
+      style = {},
     },
-  ];
+    ref
+  ) => {
+    const letterRefs = useRef<(HTMLSpanElement | null)[]>([]);
+    const mousePositionRef = useMousePositionRef(containerRef);
 
-  return (
-    <div className="min-h-screen bg-[#020617] text-white overflow-hidden">
-      <Navbar />
+    const parsedSettings = useMemo(() => {
+      const parse = (str: string) =>
+        new Map(
+          str.split(",").map((s) => {
+            const [axis, val] = s.trim().split(" ");
+            return [
+              axis.replace(/['"]/g, ""),
+              parseFloat(val),
+            ];
+          })
+        );
 
-      <div className="pt-32 px-6">
-        
-        {/* HEADING */}
-        <div ref={containerRef} className="flex justify-center mb-20">
-          <VariableProximity
-            label="Choose Your Game"
-            className="text-5xl md:text-7xl font-extrabold bg-gradient-to-r from-purple-400 via-pink-500 to-green-400 bg-clip-text text-transparent"
-            style={{ fontFamily: "Roboto Flex, sans-serif" }}
-            fromFontVariationSettings="'wght' 100"
-            toFontVariationSettings="'wght' 1000"
-            containerRef={containerRef}
-            radius={140}
-          />
-        </div>
+      const from = parse(fromFontVariationSettings);
+      const to = parse(toFontVariationSettings);
 
-        {/* GAME CARD */}
-        <div className="flex justify-center">
-          {games.map((game) => (
-            <GameCard key={game.id} game={game} />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
+      return Array.from(from.entries()).map(([axis, fromVal]) => ({
+        axis,
+        fromVal,
+        toVal: to.get(axis) ?? fromVal,
+      }));
+    }, [fromFontVariationSettings, toFontVariationSettings]);
 
-function GameCard({ game }: any) {
-  const [rotate, setRotate] = useState({ x: 0, y: 0 });
+    useAnimationFrame(() => {
+      if (!containerRef.current) return;
 
-  const handleMouseMove = (e: any) => {
-    const rect = e.currentTarget.getBoundingClientRect();
+      letterRefs.current.forEach((el) => {
+        if (!el) return;
 
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+        const rect = el.getBoundingClientRect();
 
-    const midX = rect.width / 2;
-    const midY = rect.height / 2;
+        const dx =
+          mousePositionRef.current.x -
+          (rect.left + rect.width / 2);
+        const dy =
+          mousePositionRef.current.y -
+          (rect.top + rect.height / 2);
 
-    const rotateY = ((x - midX) / midX) * 12;
-    const rotateX = -((y - midY) / midY) * 12;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const strength = Math.max(0, 1 - dist / radius);
 
-    setRotate({ x: rotateX, y: rotateY });
-  };
+        const settings = parsedSettings
+          .map(({ axis, fromVal, toVal }) => {
+            const val =
+              fromVal + (toVal - fromVal) * strength;
+            return `'${axis}' ${val}`;
+          })
+          .join(", ");
 
-  return (
-    <Link href={game.path}>
-      <motion.div
-        onMouseMove={handleMouseMove}
-        onMouseLeave={() => setRotate({ x: 0, y: 0 })}
-        animate={{
-          rotateX: rotate.x,
-          rotateY: rotate.y,
-        }}
-        transition={{ type: "spring", stiffness: 120 }}
-        className="group relative w-[320px] rounded-3xl cursor-pointer"
+        el.style.fontVariationSettings = settings;
+      });
+    });
+
+    const words = label.split(" ");
+    let letterIndex = 0;
+
+    return (
+      <span
+        ref={ref}
+        className={className}
+        style={{ display: "inline", ...style }}
       >
-        <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 via-pink-500 to-green-400 blur opacity-40 group-hover:opacity-80 transition rounded-3xl" />
+        {words.map((word, wordIndex) => (
+          <span key={wordIndex} style={{ whiteSpace: "nowrap" }}>
+            {word.split("").map((letter) => {
+              const index = letterIndex++;
 
-        <div className="relative bg-[#0f172a] rounded-3xl overflow-hidden">
-          <img
-            src={game.image}
-            className="w-full h-64 object-cover group-hover:scale-110 transition"
-          />
+              return (
+                <motion.span
+                  key={index}
+                  ref={(el) => {
+                    letterRefs.current[index] = el;
+                  }}
+                  style={{ display: "inline-block" }}
+                >
+                  {letter}
+                </motion.span>
+              );
+            })}
+            {wordIndex < words.length - 1 && " "}
+          </span>
+        ))}
+      </span>
+    );
+  }
+);
 
-          <div className="absolute inset-0 bg-gradient-to-t from-black/90 to-transparent" />
+VariableProximity.displayName = "VariableProximity";
 
-          <div className="absolute bottom-0 p-5">
-            <h2 className="text-2xl font-bold text-white">
-              {game.name}
-            </h2>
-          </div>
-        </div>
-      </motion.div>
-    </Link>
-  );
-}
+export default VariableProximity;
