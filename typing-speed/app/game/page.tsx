@@ -1,6 +1,6 @@
 "use client";
 
-import Navbar from "../../components/Navbar";
+import Navbar from "@/components/Navbar";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useState, useRef } from "react";
@@ -27,7 +27,7 @@ export default function TestPage() {
         {/* 🔥 ANIMATED HEADING */}
         <div className="flex justify-center mb-20" ref={containerRef}>
           <VariableProximity
-            label="🎮 Choose Your Game"
+            label="Choose Your Game"
             className="text-5xl md:text-7xl font-extrabold bg-gradient-to-r from-purple-400 via-pink-500 to-green-400 bg-clip-text text-transparent"
             style={{ fontFamily: "Roboto Flex, sans-serif" }}
             fromFontVariationSettings="'wght' 100"
