@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import AuthModal from "./Authmodal";
 
 const navLinks = [
   { name: "Game",        href: "/game"        },
@@ -49,9 +50,14 @@ function LiveClock() {
 }
 
 const Navbar = () => {
-  const [isOpen,   setIsOpen]   = useState(false);
-  const [scrolled, setScrolled] = useState(false);
+  const [isOpen,    setIsOpen]    = useState(false);
+  const [scrolled,  setScrolled]  = useState(false);
+  const [authOpen,  setAuthOpen]  = useState(false);
+  const [authMode,  setAuthMode]  = useState<"login" | "signup">("login");
   const pathname = usePathname();
+
+  const openLogin  = () => { setAuthMode("login");  setAuthOpen(true); };
+  const openSignup = () => { setAuthMode("signup"); setAuthOpen(true); };
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 16);
@@ -78,7 +84,7 @@ const Navbar = () => {
             : "none",
         }}
       >
-        {/* subtle top highlight */}
+        {/* Subtle top highlight */}
         <div
           className="absolute top-0 left-0 right-0 h-[1px] pointer-events-none"
           style={{
@@ -111,7 +117,6 @@ const Navbar = () => {
                   style={{ background: "rgba(34,197,94,0.15)" }}
                 />
               </div>
-
               <span className="text-[18px] font-black tracking-tight leading-none">
                 <span className="text-white">KEY</span>
                 <span
@@ -134,32 +139,31 @@ const Navbar = () => {
                   <Link
                     key={link.name}
                     href={link.href}
-                    className="relative px-4 py-1.5 text-[12px] font-semibold tracking-wide transition-all duration-200 rounded-lg group"
+                    className="relative px-4 py-1.5 text-[12px] font-semibold tracking-wide transition-all duration-200 rounded-lg"
                     style={{
-                      color: isActive ? "#4ade80" : "#9ca3af",
+                      color:      isActive ? "#4ade80" : "#9ca3af",
                       background: isActive ? "rgba(34,197,94,0.08)" : "transparent",
                     }}
                     onMouseEnter={(e) => {
                       if (!isActive) {
-                        (e.currentTarget as HTMLAnchorElement).style.color = "#f9fafb";
+                        (e.currentTarget as HTMLAnchorElement).style.color      = "#f9fafb";
                         (e.currentTarget as HTMLAnchorElement).style.background = "rgba(255,255,255,0.05)";
                       }
                     }}
                     onMouseLeave={(e) => {
                       if (!isActive) {
-                        (e.currentTarget as HTMLAnchorElement).style.color = "#9ca3af";
+                        (e.currentTarget as HTMLAnchorElement).style.color      = "#9ca3af";
                         (e.currentTarget as HTMLAnchorElement).style.background = "transparent";
                       }
                     }}
                   >
                     {link.name}
-                    {/* active pill underline */}
                     {isActive && (
                       <span
                         className="absolute bottom-0 left-1/2 -translate-x-1/2 h-[2px] w-1/2 rounded-full"
                         style={{
                           background: "linear-gradient(90deg, #22c55e, #4ade80)",
-                          boxShadow: "0 0 8px rgba(34,197,94,0.6)",
+                          boxShadow:  "0 0 8px rgba(34,197,94,0.6)",
                         }}
                       />
                     )}
@@ -171,39 +175,30 @@ const Navbar = () => {
             {/* ── Right side ── */}
             <div className="hidden md:flex items-center gap-3 flex-shrink-0">
               <LiveClock />
-
-              {/* divider */}
               <div className="w-px h-5 bg-white/10" />
 
+              {/* Login button */}
               <button
-                className="relative px-5 py-2 text-[12px] font-bold tracking-wide rounded-lg overflow-hidden transition-all duration-300 group"
+                onClick={openLogin}
+                className="relative px-5 py-2 text-[12px] font-bold tracking-wide rounded-lg overflow-hidden transition-all duration-300"
                 style={{
                   background: "linear-gradient(135deg, rgba(34,197,94,0.15) 0%, rgba(74,222,128,0.1) 100%)",
-                  border: "1px solid rgba(34,197,94,0.3)",
-                  color: "#4ade80",
-                  boxShadow: "0 0 0 0 rgba(34,197,94,0)",
+                  border:     "1px solid rgba(34,197,94,0.3)",
+                  color:      "#4ade80",
                 }}
                 onMouseEnter={(e) => {
                   const b = e.currentTarget as HTMLButtonElement;
-                  b.style.background = "linear-gradient(135deg, rgba(34,197,94,0.25) 0%, rgba(74,222,128,0.18) 100%)";
-                  b.style.boxShadow  = "0 0 20px rgba(34,197,94,0.25), inset 0 1px 0 rgba(255,255,255,0.1)";
-                  b.style.borderColor = "rgba(34,197,94,0.5)";
+                  b.style.background   = "linear-gradient(135deg, rgba(34,197,94,0.25) 0%, rgba(74,222,128,0.18) 100%)";
+                  b.style.boxShadow    = "0 0 20px rgba(34,197,94,0.25), inset 0 1px 0 rgba(255,255,255,0.1)";
+                  b.style.borderColor  = "rgba(34,197,94,0.5)";
                 }}
                 onMouseLeave={(e) => {
                   const b = e.currentTarget as HTMLButtonElement;
                   b.style.background  = "linear-gradient(135deg, rgba(34,197,94,0.15) 0%, rgba(74,222,128,0.1) 100%)";
-                  b.style.boxShadow   = "0 0 0 0 rgba(34,197,94,0)";
+                  b.style.boxShadow   = "none";
                   b.style.borderColor = "rgba(34,197,94,0.3)";
                 }}
               >
-                {/* glass sheen */}
-                <span
-                  className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
-                  style={{
-                    background:
-                      "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, transparent 60%)",
-                  }}
-                />
                 <span className="relative">Login</span>
               </button>
             </div>
@@ -235,11 +230,11 @@ const Navbar = () => {
       <div
         className="fixed left-0 right-0 z-40 md:hidden overflow-hidden transition-all duration-300 ease-in-out"
         style={{
-          top: "60px",
-          maxHeight: isOpen ? "360px" : "0px",
+          top:       "60px",
+          maxHeight: isOpen ? "400px" : "0px",
           backdropFilter: "blur(20px) saturate(180%)",
           WebkitBackdropFilter: "blur(20px) saturate(180%)",
-          background: "linear-gradient(180deg, rgba(2,6,23,0.97) 0%, rgba(5,15,35,0.98) 100%)",
+          background:   "linear-gradient(180deg, rgba(2,6,23,0.97) 0%, rgba(5,15,35,0.98) 100%)",
           borderBottom: isOpen ? "1px solid rgba(34,197,94,0.1)" : "none",
         }}
       >
@@ -254,33 +249,53 @@ const Navbar = () => {
                 className="flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-150"
                 style={{
                   background: isActive ? "rgba(34,197,94,0.08)" : "transparent",
-                  color:      isActive ? "#4ade80"              : "#9ca3af",
+                  color:      isActive ? "#4ade80"               : "#9ca3af",
                   border:     isActive ? "1px solid rgba(34,197,94,0.15)" : "1px solid transparent",
                 }}
               >
                 <span className="text-sm font-semibold tracking-wide">{link.name}</span>
-                {isActive && (
-                  <span className="text-green-400 text-xs">●</span>
-                )}
+                {isActive && <span className="text-green-400 text-xs">●</span>}
               </Link>
             );
           })}
 
-          <div className="mt-2 pt-3 border-t border-white/5 flex items-center justify-between">
+          <div className="mt-2 pt-3 border-t border-white/5 flex items-center justify-between gap-3">
             <LiveClock />
-            <button
-              className="px-6 py-2.5 rounded-xl text-sm font-bold tracking-wide"
-              style={{
-                background: "linear-gradient(135deg, rgba(34,197,94,0.18) 0%, rgba(74,222,128,0.12) 100%)",
-                border: "1px solid rgba(34,197,94,0.3)",
-                color: "#4ade80",
-              }}
-            >
-              Login
-            </button>
+            {/* Mobile login + signup buttons */}
+            <div className="flex gap-2 ml-auto">
+              <button
+                onClick={() => { setIsOpen(false); openSignup(); }}
+                className="px-4 py-2 rounded-xl text-sm font-bold tracking-wide"
+                style={{
+                  background: "transparent",
+                  border:     "1px solid rgba(34,197,94,0.2)",
+                  color:      "#6b7280",
+                }}
+              >
+                Sign Up
+              </button>
+              <button
+                onClick={() => { setIsOpen(false); openLogin(); }}
+                className="px-5 py-2 rounded-xl text-sm font-bold tracking-wide"
+                style={{
+                  background: "linear-gradient(135deg, rgba(34,197,94,0.18) 0%, rgba(74,222,128,0.12) 100%)",
+                  border:     "1px solid rgba(34,197,94,0.3)",
+                  color:      "#4ade80",
+                }}
+              >
+                Login
+              </button>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* ── Auth Modal ── */}
+      <AuthModal
+        isOpen={authOpen}
+        defaultMode={authMode}
+        onClose={() => setAuthOpen(false)}
+      />
     </>
   );
 };
