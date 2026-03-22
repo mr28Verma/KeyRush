@@ -14,7 +14,6 @@ export default function Home() {
       behavior: "smooth",
       block: "center",
     });
-
     setTimeout(() => {
       const input = document.querySelector("input") as HTMLInputElement;
       input?.focus();
@@ -23,27 +22,47 @@ export default function Home() {
 
   return (
     <div className="min-h-screen relative overflow-x-hidden bg-[#020617] text-white">
-      
-      {/* 🔥 Background */}
-      
 
-      {/* 🔥 Navbar */}
+      {/* ── Animated canvas background ── */}
+      <Background />
+
+      {/* ── Radial green glow (top-center) ── */}
+      <div
+        className="fixed inset-0 pointer-events-none"
+        style={{
+          zIndex: 1,
+          background:
+            "radial-gradient(ellipse 60% 35% at 50% 0%, rgba(34,197,94,0.07) 0%, transparent 70%)",
+        }}
+      />
+
+      {/* ── Bottom vignette ── */}
+      <div
+        className="fixed inset-0 pointer-events-none"
+        style={{
+          zIndex: 1,
+          background:
+            "radial-gradient(ellipse 100% 40% at 50% 110%, rgba(2,6,23,0.85) 0%, transparent 70%)",
+        }}
+      />
+
+      {/* ── Navbar ── */}
       <Navbar />
 
-      {/* 🔥 Main */}
-      <main className="relative z-10 pt-32 pb-16">
+      {/* ── Main content ── */}
+      <main className="relative pt-32 pb-16" style={{ zIndex: 2 }}>
         <section className="max-w-7xl mx-auto px-4 text-center flex flex-col items-center">
 
-          {/* STATUS BADGE */}
+          {/* Status badge */}
           <div className="inline-flex items-center gap-2 px-4 py-1 mb-6 text-[11px] font-mono uppercase tracking-widest border rounded-full border-green-500/20 bg-green-500/10 text-green-400 shadow-[0_0_20px_rgba(34,197,94,0.2)]">
             <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex w-full h-full bg-green-400 rounded-full opacity-75 animate-ping"></span>
-              <span className="relative inline-flex w-2 h-2 bg-green-500 rounded-full"></span>
+              <span className="absolute inline-flex w-full h-full bg-green-400 rounded-full opacity-75 animate-ping" />
+              <span className="relative inline-flex w-2 h-2 bg-green-500 rounded-full" />
             </span>
             SYSTEM CORE: OPTIMIZED
           </div>
 
-          {/* GLITCH TITLE */}
+          {/* Glitch title */}
           <GlitchText
             text="KEYRUSH"
             className="text-6xl md:text-8xl font-black italic mb-6"
@@ -54,51 +73,31 @@ export default function Home() {
             Master your keyboard with precision and speed.
           </p>
 
-          {/* Buttons */}
+          {/* CTA buttons */}
           <div className="flex gap-4 justify-center mb-32 flex-wrap">
             <button
               onClick={scrollToTest}
-              className="px-10 py-4 bg-green-500 text-black font-bold hover:scale-105 transition"
+              className="px-10 py-4 bg-green-500 text-black font-bold hover:scale-105 transition shadow-[0_0_30px_rgba(34,197,94,0.25)] hover:shadow-[0_0_50px_rgba(34,197,94,0.45)]"
             >
               START TEST
             </button>
-
             <a
-              href="/test"
-              className="px-10 py-4 border border-white/10 hover:bg-white/5 transition"
+              href="/game"
+              className="px-10 py-4 border border-white/10 hover:bg-white/5 hover:border-green-500/30 transition"
             >
               Games
             </a>
           </div>
 
-          {/* Typing Area */}
+          {/* Typing area */}
           <div
             ref={typingSectionRef}
-            className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-10 duration-1000"
+            className="w-full max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-10 duration-1000"
           >
             <TypingArea />
           </div>
 
-          {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-t border-white/5 pt-10 max-w-4xl mx-auto mt-20">
-            {[
-              { label: "WPM", value: "0" },
-              { label: "Accuracy", value: "100%" },
-              { label: "Time", value: "30s" },
-              { label: "Status", value: "READY" },
-            ].map((stat) => (
-              <div key={stat.label} className="text-center">
-                <div className="text-2xl font-bold text-white">
-                  {stat.value}
-                </div>
-                <div className="text-xs text-gray-500 mt-1 uppercase tracking-wider">
-                  {stat.label}
-                </div>
-              </div>
-            ))}
-          </div>
-
-        </section>
+      </section>
       </main>
     </div>
   );
