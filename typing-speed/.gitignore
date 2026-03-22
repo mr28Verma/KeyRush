@@ -6,7 +6,7 @@
 .pnp.*
 .yarn/*
 !.yarn/patches
-!.yarn/plugins
+!.yarn/pluginsgit rm -r --cached node_modules
 !.yarn/releases
 !.yarn/versions
 

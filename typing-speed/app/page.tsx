@@ -97,7 +97,7 @@ export default function Home() {
             <TypingArea />
           </div>
 
-      </section>
+        </section>
       </main>
     </div>
   );
