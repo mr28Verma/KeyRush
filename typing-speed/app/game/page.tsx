@@ -8,11 +8,10 @@ import React, {
 } from "react";
 import { motion } from "framer-motion";
 
-/* ✅ FIXED TYPE HERE */
 type Props = {
-  label: string;
-  fromFontVariationSettings: string;
-  toFontVariationSettings: string;
+  label?: string; // ✅ optional
+  fromFontVariationSettings?: string; // ✅ optional
+  toFontVariationSettings?: string;   // ✅ optional
   containerRef: React.RefObject<HTMLElement | null>;
   radius?: number;
   className?: string;
@@ -54,7 +53,8 @@ function useMousePositionRef(
     };
 
     window.addEventListener("mousemove", handleMouseMove);
-    return () => window.removeEventListener("mousemove", handleMouseMove);
+    return () =>
+      window.removeEventListener("mousemove", handleMouseMove);
   }, [containerRef]);
 
   return positionRef;
@@ -63,9 +63,9 @@ function useMousePositionRef(
 const VariableProximity = forwardRef<HTMLSpanElement, Props>(
   (
     {
-      label,
-      fromFontVariationSettings,
-      toFontVariationSettings,
+      label = "", // ✅ default value
+      fromFontVariationSettings = "",
+      toFontVariationSettings = "",
       containerRef,
       radius = 120,
       className = "",
@@ -77,10 +77,10 @@ const VariableProximity = forwardRef<HTMLSpanElement, Props>(
     const mousePositionRef = useMousePositionRef(containerRef);
 
     const parsedSettings = useMemo(() => {
-      const parse = (str: string) =>
+      const parse = (str: string = "") =>
         new Map(
-          str.split(",").map((s) => {
-            const [axis, val] = s.trim().split(" ");
+          (str || "").split(",").map((s) => {
+            const [axis = "", val = "0"] = s.trim().split(" ");
             return [
               axis.replace(/['"]/g, ""),
               parseFloat(val),
@@ -128,7 +128,9 @@ const VariableProximity = forwardRef<HTMLSpanElement, Props>(
       });
     });
 
-    const words = label.split(" ");
+    // ✅ SAFE split (FIXED)
+    const words = (label || "").split(" ");
+
     let letterIndex = 0;
 
     return (
@@ -139,7 +141,7 @@ const VariableProximity = forwardRef<HTMLSpanElement, Props>(
       >
         {words.map((word, wordIndex) => (
           <span key={wordIndex} style={{ whiteSpace: "nowrap" }}>
-            {word.split("").map((letter) => {
+            {(word || "").split("").map((letter) => {
               const index = letterIndex++;
 
               return (
