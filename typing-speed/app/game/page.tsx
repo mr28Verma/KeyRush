@@ -1,583 +1,392 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { RotateCcw, Timer, Zap, Target, Lock, Award, RefreshCw } from "lucide-react";
+import { useRef } from "react";
+import { useGameAnimations } from "@/components/Animation";
+import Navbar from "@/components/Navbar";
 
-/* ── Inspirational quote fallbacks (used if API fails) ── */
-const FALLBACK_QUOTES = [
-  { text: "The secret of getting ahead is getting started.", author: "Mark Twain" },
-  { text: "It does not matter how slowly you go as long as you do not stop.", author: "Confucius" },
-  { text: "Everything you can imagine is real.", author: "Pablo Picasso" },
-  { text: "Believe you can and you are halfway there.", author: "Theodore Roosevelt" },
-  { text: "The only way to do great work is to love what you do.", author: "Steve Jobs" },
-  { text: "In the middle of every difficulty lies opportunity.", author: "Albert Einstein" },
-  { text: "Life is what happens when you are busy making other plans.", author: "John Lennon" },
-  { text: "The future belongs to those who believe in the beauty of their dreams.", author: "Eleanor Roosevelt" },
+const games = [
+  {
+    id: 1,
+    title: "Reaction Rush",
+    genre: "Reflex",
+    description: "Test your raw reaction speed. Click the moment you see green.",
+    players: "124K",
+    rating: 4.9,
+    difficulty: "Hard",
+    tag: "HOT",
+    gradient: "from-green-500 to-emerald-900",
+    icon: "⚡",
+  },
+  {
+    id: 2,
+    title: "Type Racer X",
+    genre: "Typing",
+    description: "Race against others in high-speed typing duels.",
+    players: "98K",
+    rating: 4.8,
+    difficulty: "Medium",
+    tag: "NEW",
+    gradient: "from-lime-400 to-green-900",
+    icon: "⌨️",
+  },
+  {
+    id: 3,
+    title: "Click Storm",
+    genre: "Clicking",
+    description: "How many clicks per second can you achieve? Set your record.",
+    players: "210K",
+    rating: 4.7,
+    difficulty: "Easy",
+    tag: "TOP",
+    gradient: "from-green-600 to-teal-900",
+    icon: "🖱️",
+  },
+  {
+    id: 4,
+    title: "Aim Sniper",
+    genre: "Aim Training",
+    description: "Precision targeting. Hit moving targets with deadly accuracy.",
+    players: "76K",
+    rating: 4.6,
+    difficulty: "Hard",
+    tag: "PRO",
+    gradient: "from-emerald-500 to-green-950",
+    icon: "🎯",
+  },
+  {
+    id: 5,
+    title: "Sequence Blitz",
+    genre: "Memory",
+    description: "Memorize and repeat color sequences at lightning speed.",
+    players: "53K",
+    rating: 4.5,
+    difficulty: "Medium",
+    tag: "FUN",
+    gradient: "from-green-400 to-cyan-900",
+    icon: "🧠",
+  },
+  {
+    id: 6,
+    title: "Dodge Matrix",
+    genre: "Reflex",
+    description: "Evade incoming projectiles using pure instinct and speed.",
+    players: "89K",
+    rating: 4.8,
+    difficulty: "Extreme",
+    tag: "HOT",
+    gradient: "from-teal-400 to-green-900",
+    icon: "🕹️",
+  },
 ];
 
-interface QuoteResult { text: string; author: string; }
-
-/* ── Fetch inspirational quote ── */
-const fetchQuote = async (): Promise<QuoteResult> => {
-  try {
-    // Quotable API — short quotes only (max 100 chars), works CORS-free in browser
-    const res = await fetch("https://api.quotable.io/random?maxLength=120");
-    if (!res.ok) throw new Error("API error");
-    const data = await res.json();
-    return { text: data.content as string, author: data.author as string };
-  } catch {
-    // Fallback to built-in list
-    const q = FALLBACK_QUOTES[Math.floor(Math.random() * FALLBACK_QUOTES.length)];
-    return q;
-  }
+const difficultyColor: Record<string, string> = {
+  Easy: "text-green-400 border-green-400",
+  Medium: "text-yellow-400 border-yellow-400",
+  Hard: "text-orange-400 border-orange-400",
+  Extreme: "text-red-400 border-red-400",
 };
 
-type Mode = "30" | "60" | "custom";
-
-interface TypingAreaProps {
-  onStatsChange?: (wpm: number, accuracy: number, timeLeft: number, started: boolean, finished: boolean) => void;
-}
-
-/* ══════════════════════════════════════════
-   ROAST / MOTIVATE MESSAGE ENGINE
-══════════════════════════════════════════ */
-function getFeedbackMessage(wpm: number, acc: number): { emoji: string; msg: string; color: string } {
-  // High WPM, trash accuracy
-  if (wpm >= 80 && acc < 70)  return { emoji: "💀", msg: "Bro typed like his keyboard was on fire. Slow down and actually HIT THE RIGHT KEYS.", color: "#f87171" };
-  if (wpm >= 60 && acc < 75)  return { emoji: "🤦", msg: "Fast fingers, zero brain. Your accuracy is an embarrassment to keyboards everywhere.", color: "#f87171" };
-  if (wpm >= 40 && acc < 80)  return { emoji: "😬", msg: "Speed means nothing when half your letters are wrong. A drunk sloth types more accurately.", color: "#fb923c" };
-
-  // Low WPM, high accuracy
-  if (wpm < 20 && acc >= 95)  return { emoji: "🐢", msg: "100% accuracy at 18 WPM... are you typing with one finger? Or a pencil?", color: "#fb923c" };
-  if (wpm < 30 && acc >= 90)  return { emoji: "🦥", msg: "You're accurate but slower than government paperwork. Pick up the pace!", color: "#fb923c" };
-  if (wpm < 40 && acc >= 85)  return { emoji: "😅", msg: "Not bad on accuracy, but your speed needs CPR. Keep grinding.", color: "#facc15" };
-
-  // Both bad
-  if (wpm < 20 && acc < 75)   return { emoji: "💩", msg: "Slow AND wrong. The worst combo. Did you type this with your elbow?", color: "#f87171" };
-  if (wpm < 30 && acc < 80)   return { emoji: "😭", msg: "Both your speed and accuracy are crying. Time to practice. A lot.", color: "#f87171" };
-
-  // Close to milestones — motivate
-  if (wpm >= 58 && wpm < 60 && acc >= 90)  return { emoji: "🔥", msg: "2 WPM away from 60! You're SO close. One more round and you'll crack it.", color: "#4ade80" };
-  if (wpm >= 78 && wpm < 80 && acc >= 90)  return { emoji: "⚡", msg: "78 WPM?! You're basically knocking on the door of 80. Don't stop now!", color: "#4ade80" };
-  if (wpm >= 95 && wpm < 100 && acc >= 90) return { emoji: "🚀", msg: "5 WPM from 100. You're elite. Push once more — 100 WPM is RIGHT THERE.", color: "#facc15" };
-
-  // Good performance — hype
-  if (wpm >= 100 && acc >= 95) return { emoji: "👑", msg: "GOATED. 100+ WPM and pin-point accuracy. You're built different.", color: "#facc15" };
-  if (wpm >= 80 && acc >= 90)  return { emoji: "🔥", msg: "Absolutely cooking. 80+ WPM with clean accuracy — that's elite territory.", color: "#4ade80" };
-  if (wpm >= 60 && acc >= 90)  return { emoji: "💪", msg: "Solid run! 60+ WPM with great accuracy. You're above average — keep building.", color: "#4ade80" };
-  if (wpm >= 40 && acc >= 85)  return { emoji: "📈", msg: "Decent! You're in the zone. A few more sessions and you'll break 60 WPM.", color: "#60a5fa" };
-
-  // Generic ok
-  return { emoji: "🎯", msg: "Not bad. But you can do better. Hit restart and go again.", color: "#9ca3af" };
-}
-
-/* ── Performance badge ── */
-const getPerfBadge = (wpm: number, acc: number) => {
-  if (wpm >= 100 && acc >= 95) return { label: "LEGENDARY", color: "#facc15", bg: "rgba(250,204,21,0.08)", border: "rgba(250,204,21,0.25)" };
-  if (wpm >= 80  && acc >= 90) return { label: "EXPERT",    color: "#4ade80", bg: "rgba(74,222,128,0.08)", border: "rgba(74,222,128,0.25)" };
-  if (wpm >= 60  && acc >= 85) return { label: "ADVANCED",  color: "#60a5fa", bg: "rgba(96,165,250,0.08)", border: "rgba(96,165,250,0.25)" };
-  if (wpm >= 40  && acc >= 80) return { label: "AVERAGE",   color: "#a78bfa", bg: "rgba(167,139,250,0.08)", border: "rgba(167,139,250,0.25)" };
-  return                              { label: "BEGINNER",  color: "#9ca3af", bg: "rgba(156,163,175,0.08)", border: "rgba(156,163,175,0.25)" };
+const tagColor: Record<string, string> = {
+  HOT: "bg-red-500",
+  NEW: "bg-blue-500",
+  TOP: "bg-yellow-500",
+  PRO: "bg-purple-500",
+  FUN: "bg-green-500",
 };
 
-/* ── Accuracy ring ── */
-const AccuracyRing = ({ value }: { value: number }) => {
-  const r = 32;
-  const circ = 2 * Math.PI * r;
-  const offset = circ - (value / 100) * circ;
-  const color = value >= 95 ? "#4ade80" : value >= 80 ? "#facc15" : "#f87171";
-  return (
-    <svg width="80" height="80" viewBox="0 0 80 80">
-      <circle cx="40" cy="40" r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="5" />
-      <circle
-        cx="40" cy="40" r={r} fill="none" stroke={color} strokeWidth="5"
-        strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
-        transform="rotate(-90 40 40)"
-        style={{ transition: "stroke-dashoffset 1.2s ease" }}
-      />
-      <text x="40" y="44" textAnchor="middle" fill={color} fontSize="12" fontWeight="bold" fontFamily="monospace">
-        {value}%
-      </text>
-    </svg>
-  );
-};
-
-/* ── Stat card ── */
-const StatCard = ({ label, value, icon, active }: { label: string; value: string | number; icon: React.ReactNode; active: boolean }) => (
-  <div className="text-center">
-    <div className="flex justify-center items-center gap-1.5 text-gray-500 text-[11px] font-mono uppercase tracking-widest mb-2">
-      {icon}{label}
-    </div>
-    <div className={`text-4xl font-bold tabular-nums transition-colors duration-300 ${active ? "text-green-400" : "text-white/20"}`}>
-      {value}
-    </div>
-  </div>
-);
-
-/* ══════════════════════════════════════════
-   MAIN COMPONENT
-══════════════════════════════════════════ */
-const TypingArea = ({ onStatsChange }: TypingAreaProps) => {
-  const [sampleText, setSampleText]   = useState("");
-  const [quoteAuthor, setQuoteAuthor] = useState("");
-  const [customText, setCustomText]   = useState("");
-  const [mode, setMode]               = useState<Mode>("30");
-  const [userInput, setUserInput]     = useState("");
-  const [startTime, setStartTime]     = useState<number | null>(null);
-  const [isFinished, setIsFinished]   = useState(false);
-  const [isFocused, setIsFocused]     = useState(false);
-  const [duration, setDuration]       = useState(30);
-  const [timeLeft, setTimeLeft]       = useState(30);
-  const [wpm, setWpm]                 = useState(0);
-  const [accuracy, setAccuracy]       = useState(100);
-  const [finalWpm, setFinalWpm]       = useState(0);
-  const [finalAccuracy, setFinalAccuracy] = useState(100);
-  const [wpmSnapshots, setWpmSnapshots]   = useState<number[]>([]);
-
-  const inputRef    = useRef<HTMLInputElement>(null);
-  const timerRef    = useRef<ReturnType<typeof setInterval> | null>(null);
-  const snapRef     = useRef<ReturnType<typeof setInterval> | null>(null);
-  const wpmRef      = useRef(0); // always-current wpm for snapshot closure
-
-  useEffect(() => {
-    fetchQuote().then(({ text, author }) => { setSampleText(text); setQuoteAuthor(author); });
-  }, []);
-
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement).tagName === "TEXTAREA") return;
-      setIsFocused(true);
-      inputRef.current?.focus();
-    };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, []);
-
-  useEffect(() => { if (!startTime) setTimeLeft(duration); }, [duration, startTime]);
-
-  useEffect(() => {
-    onStatsChange?.(wpm, accuracy, timeLeft, !!startTime, isFinished);
-  }, [wpm, accuracy, timeLeft, startTime, isFinished, onStatsChange]);
-
-  /* Countdown */
-  useEffect(() => {
-    if (!startTime || isFinished) return;
-    timerRef.current = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) { clearInterval(timerRef.current!); setIsFinished(true); return 0; }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [startTime, isFinished]);
-
-  /* WPM snapshot sampler */
-  useEffect(() => {
-    if (!startTime || isFinished) return;
-    const interval = Math.max(4000, (duration * 1000) / 7);
-    snapRef.current = setInterval(() => {
-      setWpmSnapshots((prev) => [...prev.slice(-6), wpmRef.current]);
-    }, interval);
-    return () => { if (snapRef.current) clearInterval(snapRef.current); };
-  }, [startTime, isFinished, duration]);
-
-  /* Live WPM + accuracy */
-  useEffect(() => {
-    if (!startTime || isFinished || userInput.length === 0) return;
-    const elapsedMs = Date.now() - startTime;
-    // Don't calculate until at least 2 seconds have passed — avoids insane spikes
-    if (elapsedMs < 2000) return;
-    const elapsedMin = elapsedMs / 60000;
-    // Only count correctly typed characters for WPM (gross WPM formula)
-    const errors     = userInput.split("").filter((ch, i) => ch !== sampleText[i]).length;
-    const correctChars = userInput.length - errors;
-    const currentWpm = Math.max(0, Math.round((correctChars / 5) / elapsedMin));
-    const currentAcc = Math.round(((userInput.length - errors) / userInput.length) * 100) || 100;
-    setWpm(currentWpm);
-    setAccuracy(currentAcc);
-    wpmRef.current = currentWpm;
-  }, [userInput, startTime, isFinished, sampleText]);
-
-  /* Freeze on finish — recalculate final WPM cleanly */
-  useEffect(() => {
-    if (!isFinished || !startTime) return;
-    const elapsedMin = (Date.now() - startTime) / 60000;
-    const errors     = userInput.split("").filter((ch, i) => ch !== sampleText[i]).length;
-    const correctChars = userInput.length - errors;
-    const finalW     = Math.max(0, Math.round((correctChars / 5) / Math.max(elapsedMin, 0.01)));
-    const finalA     = Math.round(((userInput.length - errors) / Math.max(userInput.length, 1)) * 100);
-    setFinalWpm(finalW);
-    setFinalAccuracy(finalA);
-    setWpmSnapshots((prev) => [...prev.slice(-6), finalW]);
-    wpmRef.current = finalW;
-    if (timerRef.current) clearInterval(timerRef.current);
-    if (snapRef.current)  clearInterval(snapRef.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isFinished]);
-
-  const resetTest = useCallback(async (overrideText?: string) => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    if (snapRef.current)  clearInterval(snapRef.current);
-    let nextText = overrideText ?? "";
-    let nextAuthor = "";
-    if (!nextText) {
-      const q = await fetchQuote();
-      nextText   = q.text;
-      nextAuthor = q.author;
-    }
-    setSampleText(nextText);
-    setQuoteAuthor(nextAuthor);
-    setUserInput(""); setStartTime(null); setIsFinished(false);
-    setWpm(0); setAccuracy(100); setFinalWpm(0); setFinalAccuracy(100);
-    setTimeLeft(duration); setIsFocused(false); setWpmSnapshots([]);
-    wpmRef.current = 0;
-  }, [duration]);
-
-  const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (isFinished) return;
-    const val = e.target.value;
-    if (!startTime && val.length > 0) setStartTime(Date.now());
-    if (val.length <= sampleText.length) setUserInput(val);
-    if (val.length === sampleText.length) setIsFinished(true);
-  };
-
-  const handleContainerClick = () => {
-    if (mode === "custom") return;
-    setIsFocused(true);
-    inputRef.current?.focus();
-  };
-
-  const switchMode = (newMode: Mode, newDuration?: number) => {
-    setMode(newMode);
-    if (newDuration) setDuration(newDuration);
-    if (newMode !== "custom") {
-      resetTest();
-    } else {
-      setUserInput(""); setStartTime(null); setIsFinished(false);
-      setWpm(0); setAccuracy(100); setQuoteAuthor("");
-      setTimeLeft(newDuration ?? duration); setIsFocused(false); setWpmSnapshots([]);
-    }
-  };
-
-  const isActive   = !!startTime && !isFinished;
-  const progress   = sampleText.length > 0 ? (userInput.length / sampleText.length) * 100 : 0;
-  const errors     = userInput.split("").filter((ch, i) => ch !== sampleText[i]).length;
-  const cpm        = Math.round((userInput.length / Math.max(duration - timeLeft, 1)) * 60);
-  const badge      = getPerfBadge(finalWpm, finalAccuracy);
-  const feedback   = getFeedbackMessage(finalWpm, finalAccuracy);
-
-  if (!sampleText && mode !== "custom") return null;
+export default function GamesPage() {
+  const containerRef = useRef<HTMLDivElement>(null);
+  useGameAnimations(containerRef);
 
   return (
-    <div className="w-full max-w-4xl mx-auto select-none">
+    <>
+      {/* ── Font import + scoped styles ── */}
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;700;900&display=swap');
 
-      {/* ── LIVE STATS (only while typing) ── */}
-      {!isFinished && (
-        <div className="flex justify-center gap-16 mb-12">
-          <StatCard label="WPM"  value={isActive ? wpm        : 0}      icon={<Zap    size={13} />} active={isActive} />
-          <StatCard label="ACC"  value={isActive ? `${accuracy}%` : "100%"} icon={<Target size={13} />} active={isActive} />
-          <StatCard label="TIME" value={`${timeLeft}s`}                  icon={<Timer  size={13} />} active={isActive} />
+        /*
+         * Scope the custom font ONLY inside .games-page.
+         * The Navbar lives OUTSIDE this div so its font-mono is untouched.
+         */
+        .games-page,
+        .games-page h1,
+        .games-page h2,
+        .games-page h3,
+        .games-page p,
+        .games-page span:not(.keep-font),
+        .games-page button,
+        .games-page div {
+          font-family: 'Rajdhani', 'Orbitron', sans-serif !important;
+        }
+
+        .games-page .grid-bg {
+          background-image:
+            linear-gradient(rgba(74,222,128,0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(74,222,128,0.03) 1px, transparent 1px);
+          background-size: 40px 40px;
+        }
+
+        .games-page .scanline {
+          background: repeating-linear-gradient(
+            0deg, transparent, transparent 2px,
+            rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.15) 4px
+          );
+          pointer-events: none;
+        }
+
+        .games-page .noise-overlay {
+          background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+          background-size: 200px 200px;
+        }
+
+        .games-page .circuit-pattern {
+          background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%2322c55e' stroke-width='0.5'%3E%3Cpath d='M10 10h10v10H10zM40 10h10v10H40zM10 40h10v10H10zM40 40h10v10H40z'/%3E%3Cpath d='M20 15h20M15 20v20M45 20v20M20 45h20'/%3E%3C/g%3E%3C/svg%3E");
+          background-size: 60px 60px;
+        }
+
+        .games-page .card-scanline {
+          background: repeating-linear-gradient(
+            0deg, transparent, transparent 3px,
+            rgba(74,222,128,0.03) 3px, rgba(74,222,128,0.03) 6px
+          );
+          animation: scanMove 3s linear infinite;
+        }
+
+        @keyframes scanMove {
+          0%   { background-position: 0 0; }
+          100% { background-position: 0 100px; }
+        }
+
+        /* Terminal cursor blink */
+        @keyframes blink {
+          0%, 100% { opacity: 1; }
+          50%       { opacity: 0; }
+        }
+        .cursor-blink { animation: blink 1s step-end infinite; }
+      `}</style>
+
+      {/* Navbar is OUTSIDE .games-page — its font-mono stays intact */}
+      <Navbar />
+
+      <div
+        ref={containerRef}
+        className="games-page min-h-screen bg-black text-white overflow-x-hidden"
+      >
+        {/* Fixed grid + scanline background */}
+        <div className="fixed inset-0 pointer-events-none z-0">
+          <div className="grid-bg absolute inset-0" />
+          <div className="scanline absolute inset-0" />
         </div>
-      )}
 
-      {/* ── CUSTOM INPUT ── */}
-      {mode === "custom" && (
-        <div className="mb-6 animate-in fade-in duration-300">
-          <textarea
-            value={customText}
-            onChange={(e) => setCustomText(e.target.value)}
-            placeholder="Paste or type your custom text here…"
-            rows={5}
-            className="w-full p-4 rounded-xl bg-black/40 border border-white/10 text-white font-mono text-sm outline-none resize-none placeholder:text-gray-600 focus:border-green-500/30 transition-colors"
-          />
-          <button
-            onClick={() => {
-              const trimmed = customText.trim();
-              if (!trimmed) return;
-              setSampleText(trimmed);
-              setQuoteAuthor("");
-              setUserInput(""); setStartTime(null); setIsFinished(false);
-              setWpm(0); setAccuracy(100); setTimeLeft(duration); setIsFocused(false); setMode("30");
-            }}
-            className="mt-3 px-6 py-2.5 bg-green-500 text-black font-bold text-sm rounded-lg hover:bg-green-400 transition-colors"
-          >
-            Start Custom Test
-          </button>
-        </div>
-      )}
+        {/* ── HERO — two-column ── */}
+        <section className="relative z-10 px-6 md:px-12 pt-28 pb-12">
+          <div className="max-w-7xl mx-auto flex flex-col lg:flex-row lg:items-center lg:justify-between gap-12">
 
-      {mode !== "custom" && (
-        <>
-          {isFinished ? (
-            /* ══════════════════════════════════
-               RESULTS SCREEN
-            ══════════════════════════════════ */
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-4">
+            {/* LEFT — headline + stats */}
+            <div className="hero-text flex-1 min-w-0">
+              <p className="text-green-500 text-xs tracking-[0.4em] uppercase mb-3">
+                ▶ Game Arena
+              </p>
+              <h1 className="text-5xl md:text-7xl font-black leading-none tracking-tight mb-4">
+                <span className="text-white">TEST YOUR</span>
+                <br />
+                <span
+                  className="text-green-400"
+                  style={{ textShadow: "0 0 40px rgba(74,222,128,0.5)" }}
+                >
+                  REFLEXES
+                </span>
+              </h1>
+              <p className="text-green-700 text-base md:text-lg max-w-xl mt-4 leading-relaxed">
+                Sharpen your speed. Compete globally. Every millisecond counts
+                in these high-intensity reflex games.
+              </p>
 
-              {/* ── FEEDBACK MESSAGE ── */}
-              <div
-                className="rounded-2xl px-6 py-4 border flex items-start gap-4"
-                style={{
-                  background: `${feedback.color}08`,
-                  borderColor: `${feedback.color}25`,
-                }}
-              >
-                <span className="text-3xl leading-none mt-0.5">{feedback.emoji}</span>
-                <p className="text-sm font-mono leading-relaxed" style={{ color: feedback.color }}>
-                  {feedback.msg}
-                </p>
+              {/* CTAs */}
+              <div className="flex flex-wrap gap-4 mt-8">
+                <button className="bg-green-500 text-black text-sm font-black px-7 py-3 tracking-widest uppercase hover:bg-green-400 transition-colors">
+                  PLAY NOW
+                </button>
+                <button className="border border-green-700 text-green-400 text-sm font-bold px-7 py-3 tracking-widest uppercase hover:border-green-400 hover:text-green-300 transition-colors">
+                  LEADERBOARD
+                </button>
               </div>
 
-              {/* ── MAIN RESULT CARD ── */}
-              <div
-                className="rounded-2xl border p-6"
-                style={{
-                  background: "linear-gradient(135deg, rgba(255,255,255,0.02) 0%, rgba(34,197,94,0.025) 100%)",
-                  borderColor: "rgba(34,197,94,0.12)",
-                  boxShadow: "0 0 40px rgba(34,197,94,0.04), inset 0 1px 0 rgba(255,255,255,0.04)",
-                }}
-              >
-                {/* Badge */}
-                <div className="flex justify-between items-start mb-6">
-                  <div
-                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono font-bold uppercase tracking-widest border"
-                    style={{ color: badge.color, background: badge.bg, borderColor: badge.border }}
-                  >
-                    <Award size={11} />
-                    {badge.label}
-                  </div>
-                  <div className="text-[10px] font-mono text-gray-600 uppercase tracking-widest">
-                    {mode === "30" ? "30s" : "60s"} test
-                  </div>
-                </div>
-
-                {/* WPM hero + accuracy ring */}
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <div className="text-[10px] font-mono text-gray-600 uppercase tracking-widest mb-1">words / min</div>
-                    <div className="flex items-end gap-2">
-                      <span
-                        className="text-7xl font-black tabular-nums leading-none"
-                        style={{
-                          background: "linear-gradient(135deg, #ffffff 20%, #4ade80 100%)",
-                          WebkitBackgroundClip: "text",
-                          WebkitTextFillColor: "transparent",
-                        }}
-                      >
-                        {finalWpm}
-                      </span>
-                      <span className="text-gray-600 font-mono text-xs mb-2">wpm</span>
+              {/* Stats row */}
+              <div className="stats-bar flex flex-wrap gap-8 mt-10 pt-8 border-t border-green-900/30">
+                {[
+                  { label: "Active Players",  value: "48,291" },
+                  { label: "Games Today",     value: "1.2M+"  },
+                  { label: "World Records",   value: "3,847"  },
+                ].map((stat) => (
+                  <div key={stat.label}>
+                    <div className="text-2xl font-black text-green-400">{stat.value}</div>
+                    <div className="text-xs text-green-800 tracking-widest uppercase mt-0.5">
+                      {stat.label}
                     </div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-[10px] font-mono text-gray-600 uppercase tracking-widest mb-2">accuracy</div>
-                    <AccuracyRing value={finalAccuracy} />
-                  </div>
-                </div>
-
-                {/* Secondary stats */}
-                <div className="grid grid-cols-3 gap-3 mb-6">
-                  {[
-                    { label: "CPM",    value: cpm          },
-                    { label: "Errors", value: errors       },
-                    { label: "Time",   value: `${duration}s` },
-                  ].map((s) => (
-                    <div
-                      key={s.label}
-                      className="rounded-xl p-3 text-center border border-white/[0.04]"
-                      style={{ background: "rgba(255,255,255,0.02)" }}
-                    >
-                      <div className="text-lg font-bold text-white tabular-nums">{s.value}</div>
-                      <div className="text-[10px] font-mono text-gray-600 uppercase tracking-widest mt-0.5">{s.label}</div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* ── GRAPH — locked behind login ── */}
-                <div
-                  className="rounded-xl border border-white/[0.04] overflow-hidden"
-                  style={{ background: "rgba(255,255,255,0.015)" }}
-                >
-                  <div className="flex items-center justify-between px-4 pt-3 pb-2">
-                    <span className="text-[10px] font-mono text-gray-600 uppercase tracking-widest">WPM over time</span>
-                    <span className="text-[10px] font-mono text-gray-700">{wpmSnapshots.length} pts</span>
-                  </div>
-
-                  <div className="relative px-4 pb-4">
-                    {/* Blurred fake chart behind the lock */}
-                    <div style={{ filter: "blur(3px)", opacity: 0.4 }}>
-                      <svg width="100%" height="72" viewBox="0 0 400 72" preserveAspectRatio="none">
-                        <defs>
-                          <linearGradient id="gFill" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#4ade80" stopOpacity="0.35" />
-                            <stop offset="100%" stopColor="#4ade80" stopOpacity="0" />
-                          </linearGradient>
-                        </defs>
-                        {/* fake smooth curve */}
-                        <path
-                          d="M0 60 C50 55, 80 30, 130 25 S200 35, 250 20 S330 10, 400 15"
-                          fill="none" stroke="#4ade80" strokeWidth="2" strokeLinecap="round"
-                        />
-                        <path
-                          d="M0 60 C50 55, 80 30, 130 25 S200 35, 250 20 S330 10, 400 15 L400 72 L0 72 Z"
-                          fill="url(#gFill)"
-                        />
-                        {[0,130,250,400].map((x,i) => (
-                          <circle key={i} cx={x} cy={[60,25,20,15][i]} r="3" fill="#4ade80" />
-                        ))}
-                      </svg>
-                    </div>
-
-                    {/* Login gate */}
-                    <div
-                      className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 rounded-lg"
-                      style={{ background: "rgba(2,6,23,0.75)", backdropFilter: "blur(8px)" }}
-                    >
-                      <Lock size={14} className="text-green-400" />
-                      <p className="text-[11px] font-mono text-gray-400 text-center leading-relaxed">
-                        Login to unlock your full WPM graph
-                      </p>
-                      <button
-                        className="px-5 py-1.5 text-[11px] font-mono font-bold uppercase tracking-widest rounded-lg border transition-all duration-200 hover:bg-green-500/20"
-                        style={{
-                          background: "rgba(34,197,94,0.08)",
-                          borderColor: "rgba(34,197,94,0.3)",
-                          color: "#4ade80",
-                        }}
-                      >
-                        Login / Sign up
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center justify-center gap-3 mt-5">
-                  <button
-                    onClick={() => resetTest()}
-                    className="flex items-center gap-2 px-7 py-2.5 rounded-xl font-bold text-sm transition-all duration-200"
-                    style={{
-                      background: "linear-gradient(135deg, #22c55e, #16a34a)",
-                      color: "#000",
-                      boxShadow: "0 0 20px rgba(34,197,94,0.25)",
-                    }}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 32px rgba(34,197,94,0.45)"; }}
-                    onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 20px rgba(34,197,94,0.25)"; }}
-                  >
-                    <RefreshCw size={14} /> Try Again
-                  </button>
-                  <button
-                    onClick={() => switchMode(mode === "30" ? "60" : "30", mode === "30" ? 60 : 30)}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-mono font-bold border border-white/8 transition-all duration-200 text-gray-500 hover:text-gray-200"
-                    style={{ background: "rgba(255,255,255,0.03)" }}
-                  >
-                    Try {mode === "30" ? "60s" : "30s"}
-                  </button>
-                </div>
+                ))}
               </div>
             </div>
 
-          ) : (
-            /* ══════════════════════════════════
-               TYPING BOX
-            ══════════════════════════════════ */
+            {/* RIGHT — terminal card */}
             <div
-              className="relative p-10 rounded-2xl border border-white/5 bg-white/[0.01] backdrop-blur-sm cursor-text"
-              onClick={handleContainerClick}
+              className="hero-text flex-shrink-0 w-full lg:w-[380px]"
+              style={{ animationDelay: "0.18s" }}
             >
-              {!isFocused && (
-                <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-                  <span className="text-gray-500 text-sm font-mono tracking-widest uppercase">
-                    Click or press any key to start
+              <div
+                className="border border-green-900/60 bg-black/70 backdrop-blur-sm rounded-sm overflow-hidden"
+                style={{ boxShadow: "0 0 40px rgba(74,222,128,0.06)" }}
+              >
+                {/* Terminal title bar */}
+                <div className="flex items-center gap-2 px-4 py-3 border-b border-green-900/40 bg-green-950/20">
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-500/70" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-yellow-500/70" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-green-500/70" />
+                  <span className="ml-2 text-green-700 text-xs tracking-widest" style={{ fontFamily: 'monospace' }}>
+                    keyrush_arena.exe
                   </span>
                 </div>
-              )}
-              <input
-                ref={inputRef}
-                data-typing
-                type="text"
-                value={userInput}
-                onChange={handleInput}
-                onFocus={() => setIsFocused(true)}
-                onBlur={() => { if (!startTime) setIsFocused(false); }}
-                className="absolute inset-0 opacity-0 w-full h-full cursor-text"
-                autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
-              />
-              <div className={`text-2xl font-mono leading-relaxed transition-all duration-300 ${!isFocused ? "blur-sm opacity-30" : ""}`}>
-                {sampleText.split("").map((char, i) => {
-                  let colorClass = "text-gray-600";
-                  if (i < userInput.length) {
-                    colorClass = userInput[i] === char ? "text-white" : "text-red-400 bg-red-500/10";
-                  }
-                  const isCursor = i === userInput.length && isFocused;
-                  return (
-                    <span key={i} className={`relative ${colorClass}`}>
-                      {isCursor && (
-                        <span className="absolute -left-[1px] top-[0.1em] w-[2px] h-[0.9em] bg-green-400 animate-pulse rounded-full" />
-                      )}
-                      {char}
-                    </span>
-                  );
-                })}
+
+                {/* Terminal body */}
+                <div className="p-5 space-y-2.5" style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
+                  <p className="text-green-600">
+                    <span className="text-green-400">$</span> initializing game engine...
+                  </p>
+                  <p className="text-green-500">✓ reflex module loaded</p>
+                  <p className="text-green-500">✓ leaderboard synced</p>
+                  <p className="text-green-500">✓ 48,291 players online</p>
+                  <p className="text-green-700">
+                    <span className="text-green-400">$</span> select game to begin
+                    <span className="cursor-blink text-green-400 ml-0.5">_</span>
+                  </p>
+
+                  {/* Mini game list */}
+                  <div className="mt-3 space-y-2 border-t border-green-900/30 pt-4">
+                    {[
+                      { icon: "⚡", name: "Reaction Rush", ms: "124ms avg" },
+                      { icon: "⌨️", name: "Type Racer X",  ms: "98 WPM"   },
+                      { icon: "🖱️", name: "Click Storm",   ms: "14.2 CPS" },
+                      { icon: "🎯", name: "Aim Sniper",    ms: "3px acc"  },
+                    ].map((g) => (
+                      <div
+                        key={g.name}
+                        className="flex items-center justify-between text-green-700 hover:text-green-400 transition-colors cursor-pointer group"
+                      >
+                        <span>{g.icon} {g.name}</span>
+                        <span className="text-green-900 group-hover:text-green-500 transition-colors text-xs">
+                          {g.ms} ▶
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Trophy badge below terminal */}
+              <div
+                className="mt-4 flex items-center gap-3 border border-green-800/40 bg-green-950/20 px-4 py-3 rounded-sm"
+                style={{ boxShadow: "0 0 20px rgba(74,222,128,0.04)" }}
+              >
+                <span className="text-2xl">🏆</span>
+                <div>
+                  <div className="text-green-400 text-sm font-black">Today&apos;s Top Player</div>
+                  <div className="text-green-700 text-xs tracking-widest">xShadow99 — 142ms avg</div>
+                </div>
               </div>
             </div>
-          )}
+          </div>
+        </section>
 
-          {/* Progress bar */}
-          {!isFinished && (
-            <>
-              <div className="mt-4 h-[2px] w-full bg-white/5 rounded-full overflow-hidden">
+        {/* ── Filter Bar ── */}
+        <div className="relative z-10 px-6 md:px-12 mb-8">
+          <div className="max-w-7xl mx-auto flex gap-3 flex-wrap">
+            {["All Games", "Reflex", "Typing", "Clicking", "Aim", "Memory"].map(
+              (filter, i) => (
+                <button
+                  key={filter}
+                  className={`filter-btn text-xs px-4 py-2 rounded-sm tracking-widest uppercase transition-all border ${
+                    i === 0
+                      ? "bg-green-500 text-black border-green-500 font-bold"
+                      : "border-green-900 text-green-700 hover:border-green-500 hover:text-green-400"
+                  }`}
+                >
+                  {filter}
+                </button>
+              )
+            )}
+          </div>
+        </div>
+
+        {/* ── Games Grid ── */}
+        <section className="relative z-10 px-6 md:px-12 pb-24">
+          <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {games.map((game, index) => (
+              <div
+                key={game.id}
+                className="game-card group relative bg-black border border-green-900/50 rounded-sm overflow-hidden cursor-pointer"
+                style={{ animationDelay: `${index * 0.08}s` }}
+              >
+                {/* Cover image area */}
+                <div className={`relative h-48 bg-gradient-to-br ${game.gradient} overflow-hidden`}>
+                  <div className="absolute inset-0 noise-overlay opacity-20" />
+                  <div className="absolute inset-0 circuit-pattern opacity-10" />
+
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span
+                      className="text-7xl opacity-30 group-hover:opacity-60 transition-all duration-500 group-hover:scale-110 transform"
+                      style={{ filter: "drop-shadow(0 0 20px rgba(74,222,128,0.8))" }}
+                    >
+                      {game.icon}
+                    </span>
+                  </div>
+
+                  <div className="absolute inset-0 card-scanline opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+                  <div className={`absolute top-3 left-3 ${tagColor[game.tag]} text-black text-xs font-black px-2 py-0.5 tracking-widest`}>
+                    {game.tag}
+                  </div>
+                  <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-sm text-green-400 text-xs px-2 py-0.5 tracking-widest border border-green-900/50">
+                    {game.genre}
+                  </div>
+                  <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-black to-transparent" />
+                </div>
+
+                {/* Card body */}
+                <div className="p-4">
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="text-white font-black text-lg tracking-wide group-hover:text-green-400 transition-colors">
+                      {game.title}
+                    </h3>
+                    <span className="text-green-500 text-sm font-bold">★ {game.rating}</span>
+                  </div>
+                  <p className="text-green-800 text-xs leading-relaxed mb-4">
+                    {game.description}
+                  </p>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className={`text-xs border px-2 py-0.5 rounded-sm tracking-wider ${difficultyColor[game.difficulty]}`}>
+                        {game.difficulty}
+                      </span>
+                      <span className="text-green-800 text-xs">👥 {game.players}</span>
+                    </div>
+                    <button className="play-btn text-xs text-black bg-green-500 px-3 py-1.5 font-bold tracking-widest uppercase hover:bg-green-400 transition-colors">
+                      PLAY
+                    </button>
+                  </div>
+                </div>
+
+                {/* Hover glow border */}
+                <div className="absolute inset-0 pointer-events-none border border-green-500/0 group-hover:border-green-500/40 transition-all duration-300 rounded-sm" />
                 <div
-                  className="h-full bg-green-400 transition-all duration-100 rounded-full"
-                  style={{ width: `${progress}%`, boxShadow: "0 0 8px rgba(74,222,128,0.6)" }}
+                  className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-sm"
+                  style={{ boxShadow: "inset 0 0 30px rgba(74,222,128,0.05)" }}
                 />
               </div>
-              {/* Quote author */}
-              {quoteAuthor && (
-                <div className="mt-3 flex items-center justify-end gap-1.5">
-                  <span className="text-green-500/30 text-xs font-mono">—</span>
-                  <span className="text-xs font-mono text-green-500/40 italic tracking-wide">
-                    {quoteAuthor}
-                  </span>
-                </div>
-              )}
-            </>
-          )}
-        </>
-      )}
-
-      {/* ── CONTROLS ── */}
-      {!isFinished && (
-        <div className="mt-10 flex items-center justify-between text-xs font-mono text-gray-500">
-          <div className="flex gap-1">
-            {([
-              { label: "30s",    m: "30" as Mode,     d: 30       },
-              { label: "60s",    m: "60" as Mode,     d: 60       },
-              { label: "Custom", m: "custom" as Mode, d: undefined },
-            ] as const).map(({ label, m, d }) => (
-              <button
-                key={m}
-                onClick={() => switchMode(m, d)}
-                className={`px-3 py-1.5 rounded transition-colors uppercase tracking-widest ${
-                  mode === m
-                    ? "text-green-400 bg-green-500/10 border border-green-500/20"
-                    : "text-gray-500 hover:text-gray-300"
-                }`}
-              >
-                {label}
-              </button>
             ))}
           </div>
-          <button
-            onClick={() => resetTest()}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded hover:text-gray-300 transition-colors uppercase tracking-widest"
-          >
-            <RotateCcw size={13} /> Restart
-          </button>
-        </div>
-      )}
-    </div>
+        </section>
+      </div>
+    </>
   );
-};
-
-export default TypingArea;
+}
